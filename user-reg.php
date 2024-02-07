@@ -1,38 +1,54 @@
 <?php
+// Include the database configuration file
+include 'db-config.php';
+
+// Check if the form is submitted
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register'])) {
-    // Get user inputs and sanitize them
+    // Retrieve form data and sanitize inputs
     $fullName = filter_var($_POST['fullName'], FILTER_SANITIZE_STRING);
-    $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
-    $password = password_hash($_POST['password'], PASSWORD_DEFAULT); // Hash the password for security
+    $username = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
+    $password = $_POST['password']; // No need to sanitize password as it will be hashed
 
-    // Database configuration file
-    require 'db-config.php';
-
-    // Establish database connection
-    $conn = new mysqli($host_name, $username, $password, $database);
-
-    // Check connection
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
-
-    // Prepare the INSERT statement
-    $sql = "INSERT INTO `users` (`full_name`, `email`, `password`) VALUES (?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-
-    // Bind parameters and execute the statement
-    $stmt->bind_param("sss", $fullName, $email, $password);
-
-    // Execute the statement and check if it was successful
-    if ($stmt->execute()) {
-        header("Location: registration_success.html");
-        exit;
+    // Validate input
+    if (empty($fullName) || empty($username) || empty($password)) {
+        // Handle empty fields
+        echo "Please fill in all fields.";
+    } elseif (!filter_var($username, FILTER_VALIDATE_EMAIL)) {
+        // Handle invalid email format
+        echo "Invalid email format.";
     } else {
-        echo "Error: " . $sql . "<br>" . $conn->error;
+        // Check if email already exists in the database
+        $stmt = $link->prepare("SELECT id FROM users WHERE username = ?");
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows > 0) {
+            // Handle existing email
+            echo "Email already registered. Please use a different email.";
+        } else {
+            // Hash the password for security
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+            
+            // Get the current date and time
+            $date = date('Y-m-d H:i:s');
+            
+            // Insert user into database
+            $stmt = $link->prepare("INSERT INTO users (date, fullName, username, password) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("ssss", $date, $fullName, $username, $hashedPassword);
+            
+            if ($stmt->execute()) {
+                // Registration successful
+                echo "Registration successful!";
+            } else {
+                // Handle database insertion error
+                echo "Error occurred while registering. Please try again.";
+            }
+        }
     }
-
-    // Close the statement and connection
-    $stmt->close();
-    $conn->close();
+} else {
+    // Redirect users if they try to access this page directly
+    header("Location: login.html");
+    exit;
 }
 ?>
