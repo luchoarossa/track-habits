@@ -1,45 +1,34 @@
 <?php
+session_start();
+require_once 'db-config.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
-    // Get user inputs and sanitize them
-    $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
-    $password = $_POST['password']; // No need to sanitize password
+    $email = $_POST['email'];
+    $password = $_POST['password'];
 
-    // Database configuration file
-    require 'db-config.php';
+    if (empty($email) || empty($password)) {
+        echo "Please enter both email and password.";
+    } else {
 
-    // Establish database connection
-    $conn = new mysqli($host, $db_user, $db_pass, $db_name);
-
-    // Check connection
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
-
-    // Prepare the SELECT statement to retrieve hashed password
-    $sql = "SELECT `password` FROM `users` WHERE `email` = ?";
-    $stmt = $conn->prepare($sql);
-
-    // Bind parameter and execute the statement
+    // Fetch user from database based on email
+    $stmt = $link->prepare("SELECT id, email, password FROM users WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
+    $result = $stmt->get_result();
+    $user = $result->fetch_assoc();
 
-    // Bind the result variable
-    $stmt->bind_result($hashedPassword);
-
-    // Fetch the result
-    $stmt->fetch();
-
-    // Verify the password
-    if (password_verify($password, $hashedPassword)) {
-        // Password is correct, redirect to the dashboard or another page
-        header("Location: dashboard.html");
+    // Verify password
+    if ($user && password_verify($password, $user['password'])) {
+        // Password is correct, set session variables
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['email'] = $user['email'];
+        // Redirect to dashboard or home page
+        header("Location: dashboard.php");
         exit;
     } else {
-        echo "Invalid login credentials";
+        // Incorrect email or password
+        echo "Invalid email or password. Please try again.";
     }
-
-    // Close the statement and connection
-    $stmt->close();
-    $conn->close();
+}
 }
 ?>
